@@ -1,0 +1,28 @@
+server:
+  port: ${SERVER_PORT:8090}
+
+spring:
+  application:
+    name: ids-data-platform-ingestion
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+      properties:
+        retries: 3
+
+ingestion:
+  backend-base-url: ${BACKEND_BASE_URL:http://localhost:8082}
+  page-size: 200
+  poll-interval-ms: 5000
+  topics:
+    alerts: ids.alerts
+    traffic: ids.traffic
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

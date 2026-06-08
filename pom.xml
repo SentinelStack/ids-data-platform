@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>ro.puk3p.sentinel</groupId>
+    <artifactId>ids-data-platform</artifactId>
+    <version>0.1.0</version>
+    <packaging>pom</packaging>
+
+    <name>ids-data-platform</name>
+    <description>Distributed data platform for the Sentinel IDS/IPS: Kafka ingestion + Spark processing to S3 (Parquet/Iceberg)</description>
+
+    <modules>
+        <module>ingestion</module>
+        <module>processing</module>
+    </modules>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <java.version>21</java.version>
+        <maven.compiler.release>21</maven.compiler.release>
+        <kotlin.version>2.2.0</kotlin.version>
+
+        <spring-boot.version>4.0.6</spring-boot.version>
+        <spark.version>4.0.0</spark.version>
+        <scala.binary.version>2.13</scala.binary.version>
+        <hadoop.version>3.4.1</hadoop.version>
+    </properties>
+
+    <distributionManagement>
+        <repository>
+            <id>nexus-releases</id>
+            <url>https://nexus.puk3p.online/repository/maven-releases/</url>
+        </repository>
+        <snapshotRepository>
+            <id>nexus-snapshots</id>
+            <url>https://nexus.puk3p.online/repository/maven-snapshots/</url>
+        </snapshotRepository>
+    </distributionManagement>
+</project>

@@ -1,33 +1,32 @@
 package ro.puk3p.sentinel.dataplatform.ingestion.client
 
-import com.fasterxml.jackson.databind.JsonNode
 import org.springframework.stereotype.Component
 import org.springframework.web.reactive.function.client.WebClient
 import ro.puk3p.sentinel.dataplatform.ingestion.config.IngestionProperties
-import java.time.Instant
 
 @Component
 class BackendClient(
     props: IngestionProperties,
-    builder: WebClient.Builder,
 ) {
-    private val web = builder.baseUrl(props.backendBaseUrl).build()
+    private val web = WebClient.create(props.backendBaseUrl)
     private val pageSize = props.pageSize
 
-    /** Fetches alerts created at/after [from] (ascending), as the raw ApiResponse JSON. */
-    fun fetchAlertsSince(from: Instant?): JsonNode? =
+    /**
+     * Fetches the most recent alerts (newest first) as the raw ApiResponse map.
+     * Incremental filtering is done client-side by the poller (watermark on
+     * timestamp), which avoids the backend's server-side `from` filter.
+     */
+    @Suppress("UNCHECKED_CAST")
+    fun fetchLatestAlerts(): Map<String, Any?>? =
         web.get()
             .uri { b ->
                 b.path("/api/alerts")
                     .queryParam("size", pageSize)
                     .queryParam("sortBy", "timestamp")
-                    .queryParam("direction", "asc")
-                if (from != null) {
-                    b.queryParam("from", from.toString())
-                }
-                b.build()
+                    .queryParam("direction", "desc")
+                    .build()
             }
             .retrieve()
-            .bodyToMono(JsonNode::class.java)
-            .block()
+            .bodyToMono(Map::class.java)
+            .block() as Map<String, Any?>?
 }

@@ -7,6 +7,7 @@ data class JobConfig(
     val groupId: String,
     val windowSeconds: Long,
     val alertThreshold: Int,
+    val checkpointIntervalMs: Long,
 ) {
     companion object {
         fun fromEnv(): JobConfig =
@@ -17,6 +18,7 @@ data class JobConfig(
                 groupId = env("KAFKA_GROUP_ID", "flink-anomaly-detector"),
                 windowSeconds = (env("WINDOW_SECONDS", "60").toLongOrNull() ?: 60L).coerceAtLeast(1L),
                 alertThreshold = (env("ALERT_THRESHOLD", "3").toIntOrNull() ?: 3).coerceAtLeast(1),
+                checkpointIntervalMs = (env("CHECKPOINT_INTERVAL_MS", "10000").toLongOrNull() ?: 10000L).coerceAtLeast(1000L),
             )
 
         private fun env(key: String, default: String): String =

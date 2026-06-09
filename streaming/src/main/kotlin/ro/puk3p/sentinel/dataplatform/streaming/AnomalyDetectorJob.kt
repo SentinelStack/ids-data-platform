@@ -7,6 +7,7 @@ import org.apache.flink.connector.kafka.sink.KafkaSink
 import org.apache.flink.connector.kafka.source.KafkaSource
 import org.apache.flink.connector.kafka.source.enumerator.initializer.OffsetsInitializer
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment
+import org.apache.kafka.clients.consumer.OffsetResetStrategy
 import org.apache.flink.streaming.api.windowing.assigners.TumblingProcessingTimeWindows
 import ro.puk3p.sentinel.dataplatform.streaming.config.JobConfig
 import ro.puk3p.sentinel.dataplatform.streaming.function.AlertJsonParser
@@ -18,12 +19,18 @@ fun main() {
     val config = JobConfig.fromEnv()
     val env = StreamExecutionEnvironment.getExecutionEnvironment()
 
+    // Periodic checkpoints make the KafkaSource commit offsets to its consumer
+    // group (so the group is visible with lag in Kafka UI) and let the job
+    // resume from committed offsets across restarts instead of replaying from
+    // the start of the topic.
+    env.enableCheckpointing(config.checkpointIntervalMs)
+
     val source =
         KafkaSource.builder<String>()
             .setBootstrapServers(config.bootstrapServers)
             .setTopics(config.alertsTopic)
             .setGroupId(config.groupId)
-            .setStartingOffsets(OffsetsInitializer.earliest())
+            .setStartingOffsets(OffsetsInitializer.committedOffsets(OffsetResetStrategy.EARLIEST))
             .setValueOnlyDeserializer(SimpleStringSchema())
             .build()
 

@@ -1,0 +1,106 @@
+name: IDS Data Platform CI
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      publish_processing:
+        description: "Also publish the large Spark processing fat jar (~800MB) to Nexus"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+env:
+  JAVA_VERSION: "21"
+  ARTIFACT_VERSION: "0.1.${{ github.run_number }}"
+
+jobs:
+  build-publish-deploy:
+    name: Build, Publish to Nexus and Redeploy on VPS
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: maven
+
+      - name: Configure Maven Nexus credentials
+        uses: SentinelStack/ids-infra-devops/.github/actions/setup-maven-nexus@main
+        with:
+          nexus_username: ${{ secrets.NEXUS_USERNAME }}
+          nexus_password: ${{ secrets.NEXUS_PASSWORD }}
+
+      - name: Set bumped release version
+        run: mvn -B -ntp versions:set -DnewVersion=${ARTIFACT_VERSION} -DprocessAllModules=true -DgenerateBackupPoms=false
+
+      - name: Build and package all modules
+        run: mvn -B -ntp -DskipTests clean package
+
+      - name: Publish artifacts to Nexus
+        if: github.event_name != 'pull_request'
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event.inputs.publish_processing }}" = "true" ]; then
+            echo "Publishing all modules (including the large processing fat jar)."
+            mvn -B -ntp -DskipTests deploy
+          else
+            echo "Publishing parent + ingestion + streaming; skipping the ~800MB processing fat jar to protect Nexus disk."
+            mvn -B -ntp -DskipTests deploy -pl .,ingestion,streaming
+          fi
+
+      - name: Redeploy services on the VPS
+        if: github.event_name != 'pull_request'
+        env:
+          SSH_HOST: ${{ secrets.QA_SSH_HOST }}
+          SSH_USER: ${{ secrets.QA_SSH_USER }}
+          SSH_PRIVATE_KEY: ${{ secrets.QA_SSH_PRIVATE_KEY }}
+          INFRA_PATH: /opt/ids-infra-devops
+          ENVIRONMENT: qa
+        run: |
+          set -euo pipefail
+
+          mkdir -p ~/.ssh
+          echo "${SSH_PRIVATE_KEY}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${SSH_HOST}" >> ~/.ssh/known_hosts 2>/dev/null
+
+          SSH="ssh -i $HOME/.ssh/deploy_key -o StrictHostKeyChecking=yes ${SSH_USER}@${SSH_HOST}"
+          remote="${SSH_USER}@${SSH_HOST}"
+
+          ingestion_jar=$(find ingestion/target -maxdepth 1 -name 'ids-data-platform-ingestion-*.jar' ! -name 'original-*' ! -name '*.original' | head -n1)
+          streaming_jar=$(find streaming/target -maxdepth 1 -name 'ids-data-platform-streaming-*.jar' ! -name 'original-*' | head -n1)
+          processing_jar=$(find processing/target -maxdepth 1 -name 'ids-data-platform-processing-*.jar' ! -name 'original-*' | head -n1)
+          test -n "$ingestion_jar" && test -n "$streaming_jar" && test -n "$processing_jar"
+
+          deploy_jar() {
+            local jar="$1" service="$2"
+            echo "::group::deploy ${service}"
+            $SSH "mkdir -p /opt/${service}"
+            scp -i "$HOME/.ssh/deploy_key" "$jar" "${remote}:/opt/${service}/app.jar"
+            echo "::endgroup::"
+          }
+
+          deploy_jar "$ingestion_jar" ids-data-platform-ingestion
+          deploy_jar "$streaming_jar" ids-data-platform-streaming
+          deploy_jar "$processing_jar" ids-data-platform-processing
+
+          echo "::group::restart ingestion + streaming (no secrets)"
+          $SSH "systemctl restart ids-data-platform-ingestion ids-data-platform-streaming"
+          $SSH "systemctl is-active ids-data-platform-ingestion ids-data-platform-streaming"
+          echo "::endgroup::"
+
+          echo "::group::apply processing (render AWS secrets from Vault, then restart)"
+          $SSH "${INFRA_PATH}/scripts/vps-apply.sh ids-data-platform-processing ${ENVIRONMENT}"
+          echo "::endgroup::"

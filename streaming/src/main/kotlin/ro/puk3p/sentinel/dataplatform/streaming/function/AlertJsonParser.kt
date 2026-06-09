@@ -3,6 +3,7 @@ package ro.puk3p.sentinel.dataplatform.streaming.function
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.apache.flink.api.common.functions.RichFlatMapFunction
 import org.apache.flink.util.Collector
+import org.slf4j.LoggerFactory
 import ro.puk3p.sentinel.dataplatform.streaming.model.AlertEvent
 
 class AlertJsonParser : RichFlatMapFunction<String, AlertEvent>() {
@@ -18,6 +19,7 @@ class AlertJsonParser : RichFlatMapFunction<String, AlertEvent>() {
             try {
                 json.readTree(value)
             } catch (ex: Exception) {
+                log.debug("skipping malformed alert json: {}", ex.message)
                 return
             }
         if (node == null || !node.isObject) {
@@ -36,5 +38,9 @@ class AlertJsonParser : RichFlatMapFunction<String, AlertEvent>() {
                 timestamp = node.path("timestamp").asText("").trim(),
             ),
         )
+    }
+
+    companion object {
+        private val log = LoggerFactory.getLogger(AlertJsonParser::class.java)
     }
 }

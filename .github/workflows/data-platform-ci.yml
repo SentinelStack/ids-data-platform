@@ -21,10 +21,43 @@ env:
   ARTIFACT_VERSION: "0.1.${{ github.run_number }}"
 
 jobs:
-  build-publish-deploy:
-    name: Build, Publish to Nexus and Redeploy on VPS
+  quality:
+    name: Build and Quality Gates
     runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: maven
+
+      - name: Configure Maven Nexus credentials
+        uses: SentinelStack/ids-infra-devops/.github/actions/setup-maven-nexus@main
+        with:
+          nexus_username: ${{ secrets.NEXUS_USERNAME }}
+          nexus_password: ${{ secrets.NEXUS_PASSWORD }}
+
+      - name: Compile all modules
+        run: mvn -B -ntp -DskipTests test-compile
+
+      - name: Checkstyle
+        run: mvn -B -ntp checkstyle:check
+
+      - name: PMD
+        run: mvn -B -ntp pmd:check
+
+      - name: SpotBugs
+        run: mvn -B -ntp spotbugs:check
+
+  publish-nexus:
+    name: Publish Artifacts to Nexus
+    if: github.event_name != 'pull_request'
+    needs: quality
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -45,11 +78,7 @@ jobs:
       - name: Set bumped release version
         run: mvn -B -ntp versions:set -DnewVersion=${ARTIFACT_VERSION} -DprocessAllModules=true -DgenerateBackupPoms=false
 
-      - name: Build and package all modules
-        run: mvn -B -ntp -DskipTests clean package
-
-      - name: Publish artifacts to Nexus
-        if: github.event_name != 'pull_request'
+      - name: Deploy to Nexus
         run: |
           set -euo pipefail
           if [ "${{ github.event.inputs.publish_processing }}" = "true" ]; then
@@ -60,8 +89,35 @@ jobs:
             mvn -B -ntp -DskipTests deploy -pl .,ingestion,streaming
           fi
 
-      - name: Redeploy services on the VPS
-        if: github.event_name != 'pull_request'
+  deploy-vps:
+    name: Redeploy Services on VPS
+    if: github.event_name != 'pull_request'
+    needs: quality
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: maven
+
+      - name: Configure Maven Nexus credentials
+        uses: SentinelStack/ids-infra-devops/.github/actions/setup-maven-nexus@main
+        with:
+          nexus_username: ${{ secrets.NEXUS_USERNAME }}
+          nexus_password: ${{ secrets.NEXUS_PASSWORD }}
+
+      - name: Set bumped release version
+        run: mvn -B -ntp versions:set -DnewVersion=${ARTIFACT_VERSION} -DprocessAllModules=true -DgenerateBackupPoms=false
+
+      - name: Build all module jars
+        run: mvn -B -ntp -DskipTests package
+
+      - name: Ship jars and restart services
         env:
           SSH_HOST: ${{ secrets.QA_SSH_HOST }}
           SSH_USER: ${{ secrets.QA_SSH_USER }}
@@ -86,7 +142,7 @@ jobs:
 
           deploy_jar() {
             local jar="$1" service="$2"
-            echo "::group::deploy ${service}"
+            echo "::group::ship ${service}"
             $SSH "mkdir -p /opt/${service}"
             scp -i "$HOME/.ssh/deploy_key" "$jar" "${remote}:/opt/${service}/app.jar"
             echo "::endgroup::"

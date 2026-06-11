@@ -24,13 +24,13 @@ object BatchReports {
             ),
             Report(
                 "severity_distribution",
-                "SELECT severity, COUNT(*) AS alert_count " +
-                    "FROM $view GROUP BY severity ORDER BY alert_count DESC",
+                "SELECT COALESCE(severity, 'UNKNOWN') AS severity, COUNT(*) AS alert_count " +
+                    "FROM $view GROUP BY COALESCE(severity, 'UNKNOWN') ORDER BY alert_count DESC",
             ),
             Report(
                 "type_distribution",
-                "SELECT type, COUNT(*) AS alert_count " +
-                    "FROM $view GROUP BY type ORDER BY alert_count DESC",
+                "SELECT COALESCE(type, 'UNKNOWN') AS type, COUNT(*) AS alert_count " +
+                    "FROM $view GROUP BY COALESCE(type, 'UNKNOWN') ORDER BY alert_count DESC",
             ),
             Report(
                 "daily_trend",

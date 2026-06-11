@@ -9,6 +9,14 @@ object AnomalySerializer {
         appendString(sb, "type", anomaly.type).append(',')
         appendString(sb, "sourceIp", anomaly.sourceIp).append(',')
         appendString(sb, "deviceId", anomaly.deviceId).append(',')
+        sb.append("\"deviceIds\":[")
+        anomaly.deviceIds.forEachIndexed { index, value ->
+            if (index > 0) {
+                sb.append(',')
+            }
+            sb.append('"').append(escape(value)).append('"')
+        }
+        sb.append("],")
         sb.append("\"alertCount\":").append(anomaly.alertCount).append(',')
         appendString(sb, "severity", anomaly.severity).append(',')
         appendString(sb, "windowStart", anomaly.windowStart).append(',')

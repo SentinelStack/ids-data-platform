@@ -8,6 +8,7 @@ data class JobConfig(
     val windowSeconds: Long,
     val alertThreshold: Int,
     val checkpointIntervalMs: Long,
+    val checkpointDir: String,
 ) {
     companion object {
         fun fromEnv(): JobConfig =
@@ -19,6 +20,7 @@ data class JobConfig(
                 windowSeconds = (env("WINDOW_SECONDS", "60").toLongOrNull() ?: 60L).coerceAtLeast(1L),
                 alertThreshold = (env("ALERT_THRESHOLD", "3").toIntOrNull() ?: 3).coerceAtLeast(1),
                 checkpointIntervalMs = (env("CHECKPOINT_INTERVAL_MS", "10000").toLongOrNull() ?: 10000L).coerceAtLeast(1000L),
+                checkpointDir = env("CHECKPOINT_DIR", "file:///tmp/flink-checkpoints/sentinel-anomaly-detector"),
             )
 
         private fun env(key: String, default: String): String =

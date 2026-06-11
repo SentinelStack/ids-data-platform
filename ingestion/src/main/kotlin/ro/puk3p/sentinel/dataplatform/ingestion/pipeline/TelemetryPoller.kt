@@ -4,16 +4,19 @@ import org.slf4j.LoggerFactory
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import ro.puk3p.sentinel.dataplatform.ingestion.client.AlertSource
+import ro.puk3p.sentinel.dataplatform.ingestion.config.IngestionProperties
 import ro.puk3p.sentinel.dataplatform.ingestion.publish.AlertPublisher
+import java.nio.file.Path
 import java.time.Instant
 
 @Component
 class TelemetryPoller(
     private val source: AlertSource,
     private val publisher: AlertPublisher,
+    props: IngestionProperties,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
-    private val watermark = AlertWatermark()
+    private val watermark = AlertWatermark(FileWatermarkStore(Path.of(props.watermarkFile)))
 
     @Scheduled(fixedDelayString = "\${ingestion.poll-interval-ms:5000}", initialDelay = 3000)
     fun pollAlerts() {

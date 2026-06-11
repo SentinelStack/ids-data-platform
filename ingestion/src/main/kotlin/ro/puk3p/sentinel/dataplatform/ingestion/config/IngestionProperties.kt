@@ -7,6 +7,8 @@ data class IngestionProperties(
     val backendBaseUrl: String = "http://localhost:8082",
     val pageSize: Int = 200,
     val pollIntervalMs: Long = 5000,
+    val sendTimeoutSeconds: Long = 10,
+    val watermarkFile: String = "data/alert-watermark",
     val topics: Topics = Topics(),
 ) {
     data class Topics(

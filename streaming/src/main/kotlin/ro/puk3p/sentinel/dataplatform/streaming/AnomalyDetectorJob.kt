@@ -24,6 +24,7 @@ fun main() {
     // resume from committed offsets across restarts instead of replaying from
     // the start of the topic.
     env.enableCheckpointing(config.checkpointIntervalMs)
+    env.checkpointConfig.setCheckpointStorage(config.checkpointDir)
 
     val source =
         KafkaSource.builder<String>()

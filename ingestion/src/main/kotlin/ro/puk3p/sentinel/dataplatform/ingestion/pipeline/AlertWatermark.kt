@@ -3,8 +3,8 @@ package ro.puk3p.sentinel.dataplatform.ingestion.pipeline
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicReference
 
-class AlertWatermark {
-    private val seen = AtomicReference<Instant?>(null)
+class AlertWatermark(private val store: WatermarkStore? = null) {
+    private val seen = AtomicReference<Instant?>(store?.load())
 
     fun isNew(timestamp: Instant?): Boolean {
         if (timestamp == null) {
@@ -18,8 +18,12 @@ class AlertWatermark {
         if (timestamp == null) {
             return
         }
-        seen.updateAndGet { current ->
-            if (current == null || timestamp.isAfter(current)) timestamp else current
+        val updated =
+            seen.updateAndGet { current ->
+                if (current == null || timestamp.isAfter(current)) timestamp else current
+            }
+        if (updated == timestamp) {
+            store?.save(timestamp)
         }
     }
 }

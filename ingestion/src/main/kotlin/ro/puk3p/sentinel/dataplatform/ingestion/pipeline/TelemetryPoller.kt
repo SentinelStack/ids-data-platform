@@ -25,15 +25,17 @@ class TelemetryPoller(
             return
         }
 
+        val since = watermark.current()
         var published = 0
         for (alert in alerts) {
             val timestamp = parseInstant(alert["timestamp"] as? String)
-            if (!watermark.isNew(timestamp)) {
+            val alertId = alert["alertId"]?.toString()
+            if (!watermark.isNew(since, timestamp, alertId)) {
                 continue
             }
             if (publisher.publish(keyOf(alert), alert)) {
                 published++
-                watermark.observe(timestamp)
+                watermark.observe(timestamp, alertId)
             }
         }
 

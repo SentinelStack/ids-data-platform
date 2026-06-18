@@ -10,7 +10,11 @@ class BackendAlertSource(
     props: IngestionProperties,
 ) : AlertSource {
     private val log = LoggerFactory.getLogger(javaClass)
-    private val web = WebClient.create(props.backendBaseUrl)
+    private val web =
+        WebClient.builder().baseUrl(props.backendBaseUrl).let { builder ->
+            if (props.apiKey.isNotBlank()) builder.defaultHeader("x-api-key", props.apiKey)
+            builder.build()
+        }
     private val pageSize = props.pageSize
 
     override fun fetchLatestAlerts(): List<Map<String, Any?>> {

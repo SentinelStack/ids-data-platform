@@ -15,6 +15,7 @@ spring:
 
 ingestion:
   backend-base-url: ${BACKEND_BASE_URL:http://localhost:8082}
+  api-key: ${BACKEND_API_KEY:}
   page-size: 200
   poll-interval-ms: 5000
   topics:

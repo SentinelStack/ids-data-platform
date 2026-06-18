@@ -5,6 +5,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties
 @ConfigurationProperties(prefix = "ingestion")
 data class IngestionProperties(
     val backendBaseUrl: String = "http://localhost:8082",
+    // Edge-agent API key sent as X-API-Key when polling the backend's protected
+    // /api/alerts endpoint (the platform auth lockdown made it require ROLE_AGENT).
+    val apiKey: String = "",
     val pageSize: Int = 200,
     val pollIntervalMs: Long = 5000,
     val sendTimeoutSeconds: Long = 10,
